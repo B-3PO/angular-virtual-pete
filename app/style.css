@@ -1,0 +1,17 @@
+html,
+body {
+  height: 100%;
+}
+
+
+.list-item {
+  display: flex;
+  flex-direction: row;
+  padding-left: 24px;
+  background: #FFF;
+  border-bottom: 1px solid #DDD;
+  line-height: 64px;
+  color: #666;
+  font-size: 16px;
+  font-weight: 500;
+}
