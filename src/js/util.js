@@ -11,7 +11,8 @@ angular
 function virtualPeteUtilService($timeout, $window) {
   var service = {
     debounce: debounce,
-    getOverflowParent: getOverflowParent
+    getOverflowParent: getOverflowParent,
+    getOffsetTopDifference: getOffsetTopDifference
   };
   return service;
 
@@ -54,9 +55,45 @@ function virtualPeteUtilService($timeout, $window) {
 
 
 
+  /**
+   * @ngdoc method
+   * @name virtualPeteUtil#getOffsetTopDifference
+   * @function
+   *
+   * @description
+   * Get the pixel difference in from the top of the virtual pete container and the element it is scrolling in
+   *
+   * @param {HTMLElement=} element - virtual-pete-container
+   * @param {HTMLElement=document.body} target - overflowParent. most likely md-content
+   *
+   * @return {number} - pixels
+   */
+  function getOffsetTopDifference(element, target) {
+    target = target || document.body;
+    var top = 0;
+    while (element && element !== target) {
+      top += element.offsetTop;
+      element = element.offsetParent;
+    }
+    return top;
+  }
+
+
+
+  /**
+   * @ngdoc method
+   * @name virtualPeteUtil#getOverflowParent
+   * @function
+   *
+   * @description
+   * Look for div with overflow y that teh virtual-pete-container will scroll in
+   *
+   * @param {HTMLElement=} element - virtual-pete-container
+   *
+   * @return {HTMLElement} - overflowParent
+   */
   function getOverflowParent(element) {
     var parent = element.parent();
-
     while (parent !== undefined && hasComputedStyleValue('overflow-y', parent[0]) === false) {
       if (parent[0] === document) {
         parent = undefined;
@@ -64,13 +101,11 @@ function virtualPeteUtilService($timeout, $window) {
         parent = parent.parent();
       }
     }
-    
-    return parent;
+    return parent !== undefined ? parent[0] : undefined;
   }
 
   function hasComputedStyleValue (key, target) {
     target = target || element[0];
-
     if(target === document) { return false; }
     var computedStyles = $window.getComputedStyle(target);
 

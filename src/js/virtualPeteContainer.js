@@ -55,6 +55,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var jWindow = angular.element($window);
   var debouncedUpdateSize = virtualPeteUtil.debounce(updateSize, 10, null, false);
 
+
+
   vm.register = register;
   vm.getDisplayHeight = getDisplayHeight;
   vm.setContainerHeight = setContainerHeight;
@@ -62,25 +64,31 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   vm.resetScroll = resetScroll;
   vm.scrollTo = scrollTo;
 
+
+
   function register(repeaterCtrl) {
     repeater = repeaterCtrl;
 
+    jWindow.on('resize', debouncedUpdateSize);
     if (isOverflowParent) {
       angular.element(overflowParent).on('scroll wheel touchmove touchend', rAFHandleScroll);
     } else {
       jWindow.on('scroll wheel touchmove touchend', rAFHandleScroll);
     }
-    jWindow.on('resize', debouncedUpdateSize);
 
     $scope.$on('$destroy', function() {
-      jWindow.off('scroll wheel touchmove touchend', rAFHandleScroll);
       jWindow.off('resize', debouncedUpdateSize);
+      if (isOverflowParent) {
+        angular.element(overflowParent).off('scroll wheel touchmove touchend', rAFHandleScroll);
+      } else {
+        jWindow.off('scroll wheel touchmove touchend', rAFHandleScroll);
+      }
     });
 
-    // update after code runs
-    $timeout(function () {
+    // update on next frame so items can render
+    $$rAF(function () {
       repeater.updateContainer();
-    }, 0);
+    });
   }
 
 
@@ -92,11 +100,10 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
 
   function scrollTo(position) {
     if (isOverflowParent) {
-      overflowParent[0].scrollTop = position;
+      overflowParent.scrollTop = position;
     } else {
       $window.scrollTo($window.scrollX, position);
     }
-
     handleScroll();
   }
 
@@ -136,13 +143,14 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   function handleScroll() {
     var transform;
     var update = false;
-    var viewBoundsTop = getScrollParentTop();
-    var displayTop = $element[0].getBoundingClientRect().top;
-    var height = $window.innerHeight - Math.max(viewBoundsTop, displayTop);
-    var floaterTop = Math.max(0, -displayTop + viewBoundsTop);
-    var itemSize = repeater.getItemSize();
-    var overflowOffset = (Math.max(0, (floaterTop / itemSize)) % 1) * itemSize;
-    scrollOffset = Math.max(0, getScrollParentScrollTop() - getTopDifference());
+    var viewBoundsTop = getScrollParentTop(); // overflowParent top positon on page reletive to its offset parent or 0 for body
+    var displayTop = $element[0].getBoundingClientRect().top; // the global top position of the virtual-pete-container
+    var height = $window.innerHeight - Math.max(viewBoundsTop, displayTop); // the height from the top of the overflowParent to the bottom of the page
+    var floaterTop = Math.max(0, -displayTop + viewBoundsTop); // the top position of the floating div that holds the blocks
+    var itemSize = repeater.getItemSize(); // single item height
+    var overflowOffset = (Math.max(0, (floaterTop / itemSize)) % 1) * itemSize; // an offset from 0 - itemSize to offset the positions
+    var topOffset = virtualPeteUtil.getOffsetTopDifference($element[0], overflowParent); // the y diff between the virtual-pete-container and what it is scrolling in
+    scrollOffset = Math.max(0, getScrollParentScrollTop() - topOffset); // the scroll amount after the virtual-pete-container hits the top of the overflowParent
 
     if (displayHeight !== height) {
       displayHeight = height;
@@ -170,27 +178,11 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   }
 
 
-
   function getScrollParentTop() {
-    return isOverflowParent ? overflowParent[0].offsetTop : 0;
+    return isOverflowParent ? overflowParent.offsetTop : 0;
   }
 
   function getScrollParentScrollTop() {
-    return isOverflowParent ? overflowParent[0].scrollTop : $window.scrollY;
-  }
-
-  // walk the dom to calculate the offset from the container to the overflowParent
-  function getTopDifference() {
-    var target = isOverflowParent ? overflowParent[0] : document.body;
-
-    var top = 0;
-    var current = $element[0];
-
-    while (current && current !== target) {
-      top += current.offsetTop;
-      current = current.offsetParent;
-    }
-
-    return top;
+    return isOverflowParent ? overflowParent.scrollTop : $window.scrollY;
   }
 }

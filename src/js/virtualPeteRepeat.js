@@ -63,6 +63,8 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
         }
       });
 
+
+
       function updateContainer() {
         updateIndexes();
 
@@ -72,7 +74,6 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
           updateRepeat(items, items);
         }
       }
-
 
       function updateRepeat(newItems, oldItems) {
         isVirtualRepeatUpdating = true;
@@ -205,7 +206,6 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
             Math.floor(containerCtrl.getScrollOffset() / itemHeight)));
         newVisibleEnd = newStartIndex + containerLength + NUM_EXTRA;
         newEndIndex = Math.min(itemsLength, newVisibleEnd);
-        // newStartIndex = Math.max(0, newStartIndex - NUM_EXTRA);
       }
 
 
