@@ -88,12 +88,12 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
         var newStartBlocks_ = [];
         var newEndBlocks_ = [];
 
-        // // If the number of items shrank, keep the scroll position.
-        if (items && itemsLength < items.length && containerCtrl.getScrollOffset() !== 0) {
+        // If the number of items shrank, keep the scroll position.
+        if (items && itemsLength_ < itemsLength && containerCtrl.getScrollOffset() !== 0) {
           items = newItems;
-          // var previousScrollOffset = containerCtrl.getScrollOffset();
-          // containerCtrl.resetScroll();
-          // containerCtrl.scrollTo(previousScrollOffset);
+          var previousScrollOffset = containerCtrl.getScrollOffset();
+          containerCtrl.resetScroll();
+          containerCtrl.scrollTo(previousScrollOffset);
         }
 
         if (itemsLength_ !== itemsLength) {

@@ -4,6 +4,14 @@ angular
 
 
 function HomeController($scope, $timeout) {
+  $timeout(function () {
+    // addToList();
+    // console.log('list added to');
+    // $scope.list.splice(5, 19);
+    // $scope.list.splice(0, 5)
+  }, 2000);
+
+
   $scope.list = [
     {
       id: 1,
@@ -88,16 +96,6 @@ function HomeController($scope, $timeout) {
   ];
 
 
-
-  $timeout(function () {
-    addToList();
-    console.log('list added to');
-    // $scope.list.splice(5, 19)
-  }, 2000);
-
-
-
-
   function addToList() {
     $scope.list.push({
       id: 21,
@@ -117,6 +115,21 @@ function HomeController($scope, $timeout) {
     $scope.list.push({
       id: 24,
       name: 'twenty four'
+    });
+
+    $scope.list.push({
+      id: 25,
+      name: 'twenty five'
+    });
+
+    $scope.list.push({
+      id: 26,
+      name: 'twenty six'
+    });
+
+    $scope.list.push({
+      id: 27,
+      name: 'twenty seven'
     });
   }
 }
