@@ -1,6 +1,6 @@
 {
   "name": "angular-virtual-pete",
-  "version": "0.0.0",
+  "version": "0.0.1-0",
   "description": "Angular component for virtual repeat",
   "main": [
     "dist/angular-virtual-pete.js",
@@ -14,7 +14,9 @@
     "Ben Rubin"
   ],
   "license": "MIT",
-  "keywords": ["angular, component, virtual, repeat, infinite, virtual-repeat, virtual-pete, angular-virtual-pete"],
+  "keywords": [
+    "angular, component, virtual, repeat, infinite, virtual-repeat, virtual-pete, angular-virtual-pete"
+  ],
   "ignore": [
     "**/.*",
     "node_modules",
