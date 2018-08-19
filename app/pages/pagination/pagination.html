@@ -5,7 +5,8 @@
       md-component-id="item-list"
       virtual-pete-repeat="item in list"
       virtual-pete-page-count="10"
-      virtual-pete-pagination-loader="load($page, $pageCount)">
+      virtual-pete-loader="vm.getPromotionsListPage($page, $pageCount)"
+      virtual-pete-pagination="20">
       <div  class="md-list-item-text">
         <h3>{{ item.name }}</h3>
       </div>
