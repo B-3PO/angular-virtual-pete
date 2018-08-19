@@ -15,5 +15,10 @@ function configApp($routeProvider) {
       controller: 'HomeController',
       controllerAs: 'vm'
     })
+    .when('/pagination', {
+      templateUrl: 'pages/pagination/pagination.html',
+      controller: 'PaginationController',
+      controllerAs: 'vm'
+    })
     .otherwise('/');
 }
