@@ -25,10 +25,18 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
     var match = expression.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)\s*$/);
     var repeatName = match[1];
     var repeatListExpression = $parse(match[2]);
-    var paginationLoaderExpression = tAttrs.virtualPetePaginationLoader;
-    var paginationLoaderInitExpression = tAttrs.virtualPetePaginationInit;
-    var pageCount = parseInt(tAttrs.virtualPetePageCount) || 100;
+    // var paginationLoaderExpression = tAttrs.virtualPetePaginationLoader;
+    // var paginationLoaderInitExpression = tAttrs.virtualPetePaginationInit;
+    // var pageCount = parseInt(tAttrs.virtualPetePageCount) || 100;
     var paginationParser;
+
+    var hasLoader = tAttrs.virtualPeteLoader !== undefined;
+    var loaderParser = hasLoader ? $parse(tAttrs.virtualPeteLoader) : undefined;
+    var hasPagination = tAttrs.virtualPetePagination !== undefined;
+    var pageCount = hasPagination ? parseInt(tAttrs.virtualPetePagination || 100) : undefined;
+    var hasSearch = tAttrs.virtualPeteSearchTerm !== undefined && tAttrs.virtualPeteSearchLoader !== undefined;
+    var searchTermParser = hasSearch? $parse(tAttrs.virtualPeteSearchTerm) : undefined;
+    var searchLoaderParser = hasSearch ? $parse(tAttrs.virtualPeteSearchLoader) : undefined;
 
     return function postLink(scope, element, attrs, ctrl, transclude) {
       var containerCtrl = ctrl;
@@ -46,7 +54,6 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       var newVisibleEnd = 0;
       var blocks = {};
       var pooledBlocks = [];
-      var hasPagination = paginationLoaderExpression && checkExpressionIsFunction(match[2]);
       var paginationData = {};
       var endPointTimes = [];
       var averageEndpointTime = 0;
@@ -54,6 +61,28 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       var lastPageLoaded = 1;
       var currentPage = 1;
       var listSetter;
+
+      function load(page) {
+        // used to keep track of endpoint load times. This can help with auto loading the next pages data
+        var start = Date.now();
+        var loaderReturn = hasPagination ? loaderParser(scope, { '$page': page, '$pageCount': pageCount }) : loaderParser(scope);
+
+        return $q.resolve(loaderReturn).then(function (data) {
+          endPointTimes.push(Date.now() - start);
+          averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
+          return handleLoadedData(data, page);
+        });
+      }
+
+      function handleLoadedData(data, page) {
+        if (hasPagination) {
+          paginationData[page] = data || [];
+          var combined = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
+          listSetter(scope, combined);
+        } else {
+          listSetter(scope, data);
+        }
+      }
 
       scope.$on('$destroy', function () {
         // prevent memroy leaks with data build up
@@ -66,55 +95,62 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       });
 
       // store data so we can rebuild entire data set
-      function handlePaginationData(page, pageCount) {
-        return function (data) {
-          paginationData[page] = data || [];
-          buildPaginationList();
-        };
-      }
+      // function handlePaginationData(page, pageCount) {
+      //   return function (data) {
+      //     paginationData[page] = data || [];
+      //     buildPaginationList();
+      //   };
+      // }
+      //
+      // function buildPaginationList() {
+      //   var combined = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
+      //   listSetter(scope, combined);
+      // }
 
-      function buildPaginationList() {
-        var combined = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
-        listSetter(scope, combined);
-      }
+      // function checkExpressionIsFunction(str) {
+      //   return str && (str.charAt(str.length-1) !== ')' || str.indexOf(');') > -1);
+      // }
 
-      function checkExpressionIsFunction(str) {
-        return str && (str.charAt(str.length-1) !== ')' || str.indexOf(');') > -1);
-      }
+      // function paginationLoad(page) {
+      //   if (!paginationParser) return Promise.resolve([]);
+      //   var start = Date.now();
+      //   var paginationParserReturn = paginationParser(scope, { '$page': page, '$pageCount': pageCount });
+      //
+      //   if (paginationParserReturn && typeof paginationParserReturn.then === 'function') {
+      //     return paginationParserReturn.then(function (data) {
+      //       endPointTimes.push(Date.now() - start);
+      //       averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
+      //       return handlePaginationData(page, pageCount)(data);
+      //     });
+      //   }
+      //   return $q.resolve(paginationParserReturn).then(function (data) {
+      //     endPointTimes.push(Date.now() - start);
+      //     averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
+      //     return handlePaginationData(page, pageCount)(data);
+      //   });
+      // }
 
-      function paginationLoad(page) {
-        if (!paginationParser) return Promise.resolve([]);
-        var start = Date.now();
-        var paginationParserReturn = paginationParser(scope, { '$page': page, '$pageCount': pageCount });
+      // if (paginationLoaderExpression && !checkExpressionIsFunction(match[2])) {
+      //   console.warn(
+      //     'virtual-pete: Invalid params' +
+      //     '\nWhen using "virtual-pete-pagination-loader" the list in \'virtual-pete-repeat\' cannot be a function' +
+      //     '\n\'virtual-pete-pagination-loader\' will manage the list variable' +
+      //     '\n\'virtual-pete-pagination-loader\' currently is being ignored'
+      //   );
+      // }
+      //
+      // if (hasPagination) {
+      //   setTimeout(function () {
+      //     listSetter = $parse(match[2].split(' | ')[0]).assign;
+      //     paginationParser = $parse(paginationLoaderExpression);
+      //     paginationLoad(1);
+      //   }, 0);
+      // }
 
-        if (paginationParserReturn && typeof paginationParserReturn.then === 'function') {
-          return paginationParserReturn.then(function (data) {
-            endPointTimes.push(Date.now() - start);
-            averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
-            return handlePaginationData(page, pageCount)(data);
-          });
-        }
-        return $q.resolve(paginationParserReturn).then(function (data) {
-          endPointTimes.push(Date.now() - start);
-          averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
-          return handlePaginationData(page, pageCount)(data);
-        });
-      }
-
-      if (paginationLoaderExpression && !checkExpressionIsFunction(match[2])) {
-        console.warn(
-          'virtual-pete: Invalid params' +
-          '\nWhen using "virtual-pete-pagination-loader" the list in \'virtual-pete-repeat\' cannot be a function' +
-          '\n\'virtual-pete-pagination-loader\' will manage the list variable' +
-          '\n\'virtual-pete-pagination-loader\' currently is being ignored'
-        );
-      }
-
-      if (hasPagination) {
+      if (hasLoader) {
+        listSetter = $parse(match[2].split(' | ')[0]).assign;
         setTimeout(function () {
-          listSetter = $parse(match[2].split(' | ')[0]).assign;
-          paginationParser = $parse(paginationLoaderExpression);
-          paginationLoad(1);
+          load(1);
         }, 0);
       }
 
@@ -136,8 +172,8 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         getItemCount: function () {
           return items.length;
         },
-        loadCurrentPage: function () {
-          if (hasPagination) paginationLoad(currentPage);
+        reload: function () {
+          load(currentPage);
         },
         getMdComponentId: function () {
           if (tAttrs.mdComponentId === undefined) tAttrs.$set('mdComponentId', '_expansion_panel_id_' + $mdUtil.nextUid());
@@ -306,7 +342,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         if (!paginationLoading && currentPage && hasPagination && nextPage !== lastPageLoaded && (noTimeLeft || atPagesEnd)) {
           if (paginationData[nextPage] && !paginationData[nextPage].length) return;
           paginationLoading = true;
-          paginationLoad(nextPage).then(function (data) {
+          load(nextPage).then(function (data) {
             lastPageLoaded = nextPage;
             paginationLoading = false;
           });

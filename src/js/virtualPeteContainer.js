@@ -114,7 +114,7 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     var componentId = repeater.getMdComponentId();
     deregister = $mdComponentRegistry.register({
       scrollToTop: resetScroll,
-      reload: repeater.loadCurrentPage,
+      reload: repeater.reload,
       componentId: componentId
     }, componentId);
   }
