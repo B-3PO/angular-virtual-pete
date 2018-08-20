@@ -43,6 +43,41 @@ function rAFDecorator($delegate) {
 }
 }());
 (function(){"use strict";
+peteService.$inject = ["$mdComponentRegistry", "$mdUtil", "$log"];angular
+  .module('virtual-pete')
+  .factory('$virtualPete', peteService);
+
+
+function peteService($mdComponentRegistry, $mdUtil, $log) {
+  var errorMsg = "virtual-pete '{0}' is not available! Did you use md-component-id='{0}'?";
+  var service = {
+    find: findInstance,
+    waitFor: waitForInstance
+  };
+
+  return function (handle) {
+    if (handle === undefined) { return service; }
+    return findInstance(handle);
+  };
+
+  function findInstance(handle) {
+    var instance = $mdComponentRegistry.get(handle);
+
+    if (!instance) {
+      // Report missing instance
+      $log.error( $mdUtil.supplant(errorMsg, [handle || ""]) );
+      return undefined;
+    }
+
+    return instance;
+  }
+
+  function waitForInstance(handle) {
+    return $mdComponentRegistry.when(handle).catch($log.error);
+  }
+}
+}());
+(function(){"use strict";
 virtualPeteUtilService.$inject = ["$timeout", "$window"];angular
   .module('virtual-pete')
   .factory('virtualPeteUtil', virtualPeteUtilService);
@@ -159,12 +194,16 @@ function virtualPeteUtilService($timeout, $window) {
 }
 }());
 (function(){"use strict";
-VirtualRepeatContainerController.$inject = ["$scope", "$element", "$attrs", "$parse", "$$rAF", "$window", "virtualPeteUtil", "$timeout"];angular
+VirtualRepeatContainerController.$inject = ["$scope", "$element", "$attrs", "$parse", "$$rAF", "$window", "virtualPeteUtil", "$timeout", "$mdComponentRegistry"];angular
   .module('virtual-pete')
   .directive('virtualPeteContainer', virtualPeteContainer);
 
 
 var NUM_EXTRA = 4;
+// used to calculate velocity
+// A. calculate on every n intervals
+// B. interval to calculate mean
+var VELOCITY_INTERVAL = 4;
 
 
 function virtualPeteContainer() {
@@ -194,7 +233,7 @@ function virtualPeteContainer() {
 
 
 /*@ngInject*/
-function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rAF, $window, virtualPeteUtil, $timeout) {
+function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rAF, $window, virtualPeteUtil, $timeout, $mdComponentRegistry) {
   /*jshint validthis:true*/
   var vm = this;
 
@@ -205,7 +244,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var lastFloaterTop;
   var lastOverflowOffset;
   var scrollOffset = 0;
-
+  var previousScrollTop = 0;
+  var scrollDirection;
 
   var rAFHandleScroll = $$rAF.throttle(handleScroll);
   var offsetSize = parseInt($attrs.offsetSize) || 0;
@@ -215,15 +255,16 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var isOverflowParent = overflowParent !== undefined;
   var jWindow = angular.element($window);
   var debouncedUpdateSize = virtualPeteUtil.debounce(updateSize, 10, null, false);
-
-
+  var deregister;
 
   vm.register = register;
   vm.getDisplayHeight = getDisplayHeight;
   vm.setContainerHeight = setContainerHeight;
   vm.getScrollOffset = getScrollOffset;
+  vm.getScrollDirection = getScrollDirection;
   vm.resetScroll = resetScroll;
   vm.scrollTo = scrollTo;
+  vm.debounce = virtualPeteUtil.debounce;
 
 
 
@@ -244,15 +285,26 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
       } else {
         jWindow.off('scroll wheel touchmove touchend', rAFHandleScroll);
       }
+
+      // deregister if component was already registered
+      if (typeof deregister === 'function') {
+        deregister();
+        deregister = undefined;
+      }
     });
 
     // update on next frame so items can render
     $$rAF(function () {
       repeater.updateContainer();
     });
+
+    var componentId = repeater.getMdComponentId();
+    deregister = $mdComponentRegistry.register({
+      scrollToTop: resetScroll,
+      reload: repeater.reload,
+      componentId: componentId
+    }, componentId);
   }
-
-
 
 
   function resetScroll() {
@@ -284,6 +336,10 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     return displayHeight;
   }
 
+  function getScrollDirection() {
+    return scrollDirection;
+  }
+
   function setContainerHeight(height) {
     totalHeight = height;
     $element[0].style.height = height + 'px';
@@ -301,6 +357,13 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     }
   }
 
+  // this is used for pagination loader
+  function calculateScrollMovement() {
+    var currentScrollTop = getScrollParentScrollTop();
+    scrollDirection = currentScrollTop > previousScrollTop ? 'down' : 'up';
+    previousScrollTop = currentScrollTop;
+  }
+
   function handleScroll() {
     var transform;
     var update = false;
@@ -312,6 +375,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     var overflowOffset = (Math.max(0, (floaterTop / itemSize)) % 1) * itemSize; // an offset from 0 - itemSize to offset the positions
     var topOffset = virtualPeteUtil.getOffsetTopDifference($element[0], overflowParent); // the y diff between the virtual-pete-container and what it is scrolling in
     scrollOffset = Math.max(0, getScrollParentScrollTop() - topOffset); // the scroll amount after the virtual-pete-container hits the top of the overflowParent
+
+    calculateScrollMovement();
 
     if (displayHeight !== height) {
       displayHeight = height;
@@ -349,7 +414,7 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
 }
 }());
 (function(){"use strict";
-virtualPeteRepeatDirective.$inject = ["$parse", "$rootScope", "$document"];angular
+virtualPeteRepeatDirective.$inject = ["$parse", "$rootScope", "$document", "$q", "$mdUtil"];angular
   .module('virtual-pete')
   .directive('virtualPeteRepeat', virtualPeteRepeatDirective);
 
@@ -359,7 +424,7 @@ var NUM_EXTRA = 4;
 
 
 /*@ngInject*/
-function virtualPeteRepeatDirective($parse, $rootScope, $document) {
+function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) {
   var directive = {
     restrict: 'A',
     require: '^^virtualPeteContainer',
@@ -376,6 +441,15 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
     var match = expression.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)\s*$/);
     var repeatName = match[1];
     var repeatListExpression = $parse(match[2]);
+    var paginationParser;
+
+    var hasLoader = tAttrs.virtualPeteLoader !== undefined;
+    var loaderParser = hasLoader ? $parse(tAttrs.virtualPeteLoader) : undefined;
+    var hasPagination = tAttrs.virtualPetePagination !== undefined;
+    var pageCount = hasPagination ? parseInt(tAttrs.virtualPetePagination || 100) : undefined;
+    var hasSearch = tAttrs.virtualPeteSearchTerm !== undefined && tAttrs.virtualPeteSearchLoader !== undefined;
+    var searchTermParser = hasSearch ? $parse(tAttrs.virtualPeteSearchTerm) : undefined;
+    var searchLoaderParser = hasSearch ? $parse(tAttrs.virtualPeteSearchLoader) : undefined;
 
     return function postLink(scope, element, attrs, ctrl, transclude) {
       var containerCtrl = ctrl;
@@ -393,6 +467,59 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
       var newVisibleEnd = 0;
       var blocks = {};
       var pooledBlocks = [];
+      var paginationData = {};
+      var paginationLoading = false;
+      var lastPageLoaded = 1;
+      var currentPage = 1;
+      var addedItems = [];
+      var listSetter;
+      var combinedData;
+
+      function load(page) {
+        // used to keep track of endpoint load times. This can help with auto loading the next pages data
+        var start = Date.now();
+        var loaderReturn = hasPagination ? loaderParser(scope, { '$page': page, '$pageCount': pageCount }) : loaderParser(scope);
+
+        return $q.resolve(loaderReturn).then(function (data) {
+          return handleLoadedData(data, page);
+        });
+      }
+
+      function handleLoadedData(data, page) {
+        if (hasPagination) {
+          paginationData[page] = (data || []);
+
+          // combine all pages into single array
+          combinedData = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
+        } else {
+          combinedData = data;
+        }
+
+        buildLoadedData();
+      }
+
+      // filter out dups for added items then set the view value
+      function buildLoadedData() {
+        var ids = combinedData.map(function (i) { return i.id; });
+        listSetter(scope, combinedData.concat(addedItems.filter(function (i) { return ids.indexOf(i.id) === -1; })));
+      }
+
+      scope.$on('$destroy', function () {
+        // prevent memroy leaks with data build up
+        if (hasPagination) {
+          Object.keys(paginationData).forEach(function (k) {
+            paginationData[k] = undefined;
+          });
+          paginationData = undefined;
+        }
+      });
+
+      if (hasLoader) {
+        listSetter = $parse(match[2].split(' | ')[0]).assign;
+        setTimeout(function () {
+          load(1);
+        }, 0);
+      }
 
       scope.$watchCollection(repeatListExpression, function (newItems, oldItems) {
         getItemHeight(newItems);
@@ -403,6 +530,21 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
         updateRepeat(newItems, oldItems);
       });
 
+      if (hasSearch) {
+        var searchDebounce = containerCtrl.debounce(function (value) {
+          if (!value || value.length < 2) return;
+          $q.resolve(searchLoaderParser(scope, { '$term': value })).then(function (results) {
+            var ids = addedItems.map(function (i) { return i.id; });
+            // filter out dups
+            addedItems = (results || []).filter(function (i) { return ids.indexOf(i.id) === -1; }).concat(addedItems);
+            buildLoadedData();
+          });
+        }, 200, scope);
+
+        scope.$watch(searchTermParser, function (value) {
+          searchDebounce(value);
+        });
+      }
 
       containerCtrl.register({
         updateContainer: updateContainer,
@@ -411,6 +553,13 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
         },
         getItemCount: function () {
           return items.length;
+        },
+        reload: function () {
+          load(currentPage);
+        },
+        getMdComponentId: function () {
+          if (tAttrs.mdComponentId === undefined) tAttrs.$set('mdComponentId', '_expansion_panel_id_' + $mdUtil.nextUid());
+          return tAttrs.mdComponentId;
         }
       });
 
@@ -418,6 +567,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
 
       function updateContainer() {
         updateIndexes();
+        if (hasPagination) updatePagination();
 
         if (newStartIndex !== startIndex ||
             newEndIndex !== endIndex ||
@@ -456,6 +606,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
         items = newItems;
         if (newItems !== oldItems || lengthChanged === true) {
           updateIndexes();
+          if (hasPagination) updatePagination();
         }
 
         if (lengthChanged === true) {
@@ -557,6 +708,24 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document) {
             Math.floor(containerCtrl.getScrollOffset() / itemHeight)));
         newVisibleEnd = newStartIndex + containerLength + NUM_EXTRA;
         newEndIndex = Math.min(itemsLength, newVisibleEnd);
+      }
+
+      function updatePagination() {
+        var pageEndIndex = newEndIndex - NUM_EXTRA;
+        currentPage = Math.ceil(pageEndIndex / pageCount);
+        var nextPage = containerCtrl.getScrollDirection() === 'down' ? currentPage + 1 : currentPage - 1;
+        if (nextPage < 1) nextPage = 1;
+        // var pageEnd = currentPage * pageCount;
+        // var atPagesEnd = newEndIndex >= pageEnd;
+
+        if (!paginationLoading && hasPagination && nextPage && nextPage !== lastPageLoaded) {
+          if (paginationData[nextPage] && !paginationData[nextPage].length) return;
+          paginationLoading = true;
+          load(nextPage).then(function (data) {
+            lastPageLoaded = nextPage;
+            paginationLoading = false;
+          });
+        }
       }
 
 
