@@ -52,13 +52,12 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       var blocks = {};
       var pooledBlocks = [];
       var paginationData = {};
-      var endPointTimes = [];
-      var averageEndpointTime = 0;
       var paginationLoading = false;
       var lastPageLoaded = 1;
       var currentPage = 1;
       var addedItems = [];
       var listSetter;
+      var combinedData;
 
       function load(page) {
         // used to keep track of endpoint load times. This can help with auto loading the next pages data
@@ -66,15 +65,15 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         var loaderReturn = hasPagination ? loaderParser(scope, { '$page': page, '$pageCount': pageCount }) : loaderParser(scope);
 
         return $q.resolve(loaderReturn).then(function (data) {
-          endPointTimes.push(Date.now() - start);
-          averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
           return handleLoadedData(data, page);
         });
       }
 
       function handleLoadedData(data, page) {
         if (hasPagination) {
-          paginationData[page] = data || [];
+          paginationData[page] = (data || []);
+
+          // combine all pages into single array
           combinedData = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
         } else {
           combinedData = data;
@@ -83,6 +82,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         buildLoadedData();
       }
 
+      // filter out dups for added items then set the view value
       function buildLoadedData() {
         var ids = combinedData.map(function (i) { return i.id; });
         listSetter(scope, combinedData.concat(addedItems.filter(function (i) { return ids.indexOf(i.id) === -1; })));
@@ -119,10 +119,12 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
           if (!value || value.length < 2) return;
           $q.resolve(searchLoaderParser(scope, { '$term': value })).then(function (results) {
             var ids = addedItems.map(function (i) { return i.id; });
+            // filter out dups
             addedItems = (results || []).filter(function (i) { return ids.indexOf(i.id) === -1; }).concat(addedItems);
             buildLoadedData();
-          }).catch(function (e) { console.error(e); });
+          });
         }, 200, scope);
+
         scope.$watch(searchTermParser, function (value) {
           searchDebounce(value);
         });
@@ -297,13 +299,10 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         currentPage = Math.ceil(pageEndIndex / pageCount);
         var nextPage = containerCtrl.getScrollDirection() === 'down' ? currentPage + 1 : currentPage - 1;
         if (nextPage < 1) nextPage = 1;
-        var pageEnd = currentPage * pageCount;
-        var atPagesEnd = newEndIndex >= pageEnd;
-        var distanceToEnd = (pageEnd - pageEndIndex) * itemHeight;
-        var velocity = containerCtrl.getVelocity();
-        var estamatedTimeToNextPage = (velocity === 0 ? 0 : distanceToEnd / containerCtrl.getVelocity()) || 0;
-        var noTimeLeft = estamatedTimeToNextPage === 0 ? false : estamatedTimeToNextPage <= averageEndpointTime;
-        if (!paginationLoading && currentPage && hasPagination && nextPage !== lastPageLoaded && (noTimeLeft || atPagesEnd)) {
+        // var pageEnd = currentPage * pageCount;
+        // var atPagesEnd = newEndIndex >= pageEnd;
+
+        if (!paginationLoading && hasPagination && nextPage && nextPage !== lastPageLoaded) {
           if (paginationData[nextPage] && !paginationData[nextPage].length) return;
           paginationLoading = true;
           load(nextPage).then(function (data) {

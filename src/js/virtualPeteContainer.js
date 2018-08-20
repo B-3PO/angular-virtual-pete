@@ -48,17 +48,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var lastFloaterTop;
   var lastOverflowOffset;
   var scrollOffset = 0;
-
   var previousScrollTop = 0;
-  var distanceDelta;
-  var timeDelta;
   var scrollDirection;
-  var previousTime;
-  var deltaIndex = 0;
-  var deltaTimeRecord = [];
-  var deltaDistanceRecord = [];
-  var deltaCount = 0;
-  var velocity = 0;
 
   var rAFHandleScroll = $$rAF.throttle(handleScroll);
   var offsetSize = parseInt($attrs.offsetSize) || 0;
@@ -75,7 +66,6 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   vm.setContainerHeight = setContainerHeight;
   vm.getScrollOffset = getScrollOffset;
   vm.getScrollDirection = getScrollDirection;
-  vm.getVelocity = getVelocity;
   vm.resetScroll = resetScroll;
   vm.scrollTo = scrollTo;
   vm.debounce = virtualPeteUtil.debounce;
@@ -154,10 +144,6 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     return scrollDirection;
   }
 
-  function getVelocity() {
-    return velocity;
-  }
-
   function setContainerHeight(height) {
     totalHeight = height;
     $element[0].style.height = height + 'px';
@@ -178,33 +164,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   // this is used for pagination loader
   function calculateScrollMovement() {
     var currentScrollTop = getScrollParentScrollTop();
-    var now = Date.now();
     scrollDirection = currentScrollTop > previousScrollTop ? 'down' : 'up';
-    if (previousScrollTop) distanceDelta = currentScrollTop - previousScrollTop;
-    else distanceDelta = undefined;
-    if (previousTime) timeDelta = now - previousTime;
-    else timeDelta = undefined;
     previousScrollTop = currentScrollTop;
-    previousTime = now;
-
-    if (distanceDelta) {
-      if (deltaCount > VELOCITY_INTERVAL) {
-        var meanDiviser = Math.min(VELOCITY_INTERVAL, deltaTimeRecord.length);
-        var timeMean = (deltaTimeRecord.reduce(function (a, b) { return a + b; }, 0) / meanDiviser) || 0;
-        var distanceMean = (deltaDistanceRecord.reduce(function (a, b) { return a + b; }, 0) / meanDiviser) || 0;
-        velocity = Math.abs(distanceMean / timeMean);
-        deltaCount = 0;
-        deltaTimeRecord = [];
-        deltaDistanceRecord = [];
-      }
-
-      deltaTimeRecord.push(timeDelta);
-      deltaDistanceRecord.push(distanceDelta);
-      deltaCount++;
-    } else {
-      deltaTimeRecord = [];
-      deltaDistanceRecord = [];
-    }
   }
 
   function handleScroll() {
