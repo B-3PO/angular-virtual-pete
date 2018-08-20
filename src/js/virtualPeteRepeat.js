@@ -116,6 +116,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
 
       if (hasSearch) {
         var searchDebounce = containerCtrl.debounce(function (value) {
+          if (!value || value.length < 2) return;
           $q.resolve(searchLoaderParser(scope, { '$term': value })).then(function (results) {
             var ids = addedItems.map(function (i) { return i.id; });
             addedItems = (results || []).filter(function (i) { return ids.indexOf(i.id) === -1; }).concat(addedItems);
@@ -123,7 +124,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
           }).catch(function (e) { console.error(e); });
         }, 200, scope);
         scope.$watch(searchTermParser, function (value) {
-          $q.resolve(searchDebounce(value));
+          searchDebounce(value);
         });
       }
 
