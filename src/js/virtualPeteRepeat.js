@@ -25,9 +25,6 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
     var match = expression.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)\s*$/);
     var repeatName = match[1];
     var repeatListExpression = $parse(match[2]);
-    // var paginationLoaderExpression = tAttrs.virtualPetePaginationLoader;
-    // var paginationLoaderInitExpression = tAttrs.virtualPetePaginationInit;
-    // var pageCount = parseInt(tAttrs.virtualPetePageCount) || 100;
     var paginationParser;
 
     var hasLoader = tAttrs.virtualPeteLoader !== undefined;
@@ -35,7 +32,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
     var hasPagination = tAttrs.virtualPetePagination !== undefined;
     var pageCount = hasPagination ? parseInt(tAttrs.virtualPetePagination || 100) : undefined;
     var hasSearch = tAttrs.virtualPeteSearchTerm !== undefined && tAttrs.virtualPeteSearchLoader !== undefined;
-    var searchTermParser = hasSearch? $parse(tAttrs.virtualPeteSearchTerm) : undefined;
+    var searchTermParser = hasSearch ? $parse(tAttrs.virtualPeteSearchTerm) : undefined;
     var searchLoaderParser = hasSearch ? $parse(tAttrs.virtualPeteSearchLoader) : undefined;
 
     return function postLink(scope, element, attrs, ctrl, transclude) {
@@ -60,6 +57,7 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       var paginationLoading = false;
       var lastPageLoaded = 1;
       var currentPage = 1;
+      var addedItems = [];
       var listSetter;
 
       function load(page) {
@@ -77,11 +75,17 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       function handleLoadedData(data, page) {
         if (hasPagination) {
           paginationData[page] = data || [];
-          var combined = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
-          listSetter(scope, combined);
+          combinedData = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
         } else {
-          listSetter(scope, data);
+          combinedData = data;
         }
+
+        buildLoadedData();
+      }
+
+      function buildLoadedData() {
+        var ids = combinedData.map(function (i) { return i.id; });
+        listSetter(scope, combinedData.concat(addedItems.filter(function (i) { return ids.indexOf(i.id) === -1; })));
       }
 
       scope.$on('$destroy', function () {
@@ -93,59 +97,6 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
           paginationData = undefined;
         }
       });
-
-      // store data so we can rebuild entire data set
-      // function handlePaginationData(page, pageCount) {
-      //   return function (data) {
-      //     paginationData[page] = data || [];
-      //     buildPaginationList();
-      //   };
-      // }
-      //
-      // function buildPaginationList() {
-      //   var combined = Object.keys(paginationData).reduce(function (a, p) { return a.concat(paginationData[p]); }, []);
-      //   listSetter(scope, combined);
-      // }
-
-      // function checkExpressionIsFunction(str) {
-      //   return str && (str.charAt(str.length-1) !== ')' || str.indexOf(');') > -1);
-      // }
-
-      // function paginationLoad(page) {
-      //   if (!paginationParser) return Promise.resolve([]);
-      //   var start = Date.now();
-      //   var paginationParserReturn = paginationParser(scope, { '$page': page, '$pageCount': pageCount });
-      //
-      //   if (paginationParserReturn && typeof paginationParserReturn.then === 'function') {
-      //     return paginationParserReturn.then(function (data) {
-      //       endPointTimes.push(Date.now() - start);
-      //       averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
-      //       return handlePaginationData(page, pageCount)(data);
-      //     });
-      //   }
-      //   return $q.resolve(paginationParserReturn).then(function (data) {
-      //     endPointTimes.push(Date.now() - start);
-      //     averageEndpointTime = endPointTimes.reduce(function(a, b) { return a + b; }, 0) / endPointTimes.length;
-      //     return handlePaginationData(page, pageCount)(data);
-      //   });
-      // }
-
-      // if (paginationLoaderExpression && !checkExpressionIsFunction(match[2])) {
-      //   console.warn(
-      //     'virtual-pete: Invalid params' +
-      //     '\nWhen using "virtual-pete-pagination-loader" the list in \'virtual-pete-repeat\' cannot be a function' +
-      //     '\n\'virtual-pete-pagination-loader\' will manage the list variable' +
-      //     '\n\'virtual-pete-pagination-loader\' currently is being ignored'
-      //   );
-      // }
-      //
-      // if (hasPagination) {
-      //   setTimeout(function () {
-      //     listSetter = $parse(match[2].split(' | ')[0]).assign;
-      //     paginationParser = $parse(paginationLoaderExpression);
-      //     paginationLoad(1);
-      //   }, 0);
-      // }
 
       if (hasLoader) {
         listSetter = $parse(match[2].split(' | ')[0]).assign;
@@ -163,6 +114,18 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         updateRepeat(newItems, oldItems);
       });
 
+      if (hasSearch) {
+        var searchDebounce = containerCtrl.debounce(function (value) {
+          $q.resolve(searchLoaderParser(scope, { '$term': value })).then(function (results) {
+            var ids = addedItems.map(function (i) { return i.id; });
+            addedItems = (results || []).filter(function (i) { return ids.indexOf(i.id) === -1; }).concat(addedItems);
+            buildLoadedData();
+          }).catch(function (e) { console.error(e); });
+        }, 200, scope);
+        scope.$watch(searchTermParser, function (value) {
+          $q.resolve(searchDebounce(value));
+        });
+      }
 
       containerCtrl.register({
         updateContainer: updateContainer,

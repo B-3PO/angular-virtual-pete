@@ -78,6 +78,7 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   vm.getVelocity = getVelocity;
   vm.resetScroll = resetScroll;
   vm.scrollTo = scrollTo;
+  vm.debounce = virtualPeteUtil.debounce;
 
 
 
