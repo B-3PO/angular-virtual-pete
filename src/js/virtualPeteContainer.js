@@ -7,7 +7,7 @@ var NUM_EXTRA = 4;
 // used to calculate velocity
 // A. calculate on every n intervals
 // B. interval to calculate mean
-var VELOCITY_INTERVAL = 6;
+var VELOCITY_INTERVAL = 4;
 
 
 function virtualPeteContainer() {
