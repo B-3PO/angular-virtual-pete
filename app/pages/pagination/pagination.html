@@ -1,0 +1,15 @@
+<md-list>
+  <virtual-pete-container>
+    <md-list-item
+      class="md-2-line"
+      md-component-id="item-list"
+      virtual-pete-repeat="item in list"
+      virtual-pete-page-count="10"
+      virtual-pete-loader="vm.getPromotionsListPage($page, $pageCount)"
+      virtual-pete-pagination="20">
+      <div  class="md-list-item-text">
+        <h3>{{ item.name }}</h3>
+      </div>
+    </md-list-item>
+  </virtual-pete-container>
+</md-list>

@@ -4,6 +4,10 @@ angular
 
 
 var NUM_EXTRA = 4;
+// used to calculate velocity
+// A. calculate on every n intervals
+// B. interval to calculate mean
+var VELOCITY_INTERVAL = 4;
 
 
 function virtualPeteContainer() {
@@ -33,7 +37,7 @@ function virtualPeteContainer() {
 
 
 /*@ngInject*/
-function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rAF, $window, virtualPeteUtil, $timeout) {
+function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rAF, $window, virtualPeteUtil, $timeout, $mdComponentRegistry) {
   /*jshint validthis:true*/
   var vm = this;
 
@@ -44,7 +48,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var lastFloaterTop;
   var lastOverflowOffset;
   var scrollOffset = 0;
-
+  var previousScrollTop = 0;
+  var scrollDirection;
 
   var rAFHandleScroll = $$rAF.throttle(handleScroll);
   var offsetSize = parseInt($attrs.offsetSize) || 0;
@@ -54,15 +59,16 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var isOverflowParent = overflowParent !== undefined;
   var jWindow = angular.element($window);
   var debouncedUpdateSize = virtualPeteUtil.debounce(updateSize, 10, null, false);
-
-
+  var deregister;
 
   vm.register = register;
   vm.getDisplayHeight = getDisplayHeight;
   vm.setContainerHeight = setContainerHeight;
   vm.getScrollOffset = getScrollOffset;
+  vm.getScrollDirection = getScrollDirection;
   vm.resetScroll = resetScroll;
   vm.scrollTo = scrollTo;
+  vm.debounce = virtualPeteUtil.debounce;
 
 
 
@@ -83,15 +89,26 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
       } else {
         jWindow.off('scroll wheel touchmove touchend', rAFHandleScroll);
       }
+
+      // deregister if component was already registered
+      if (typeof deregister === 'function') {
+        deregister();
+        deregister = undefined;
+      }
     });
 
     // update on next frame so items can render
     $$rAF(function () {
       repeater.updateContainer();
     });
+
+    var componentId = repeater.getMdComponentId();
+    deregister = $mdComponentRegistry.register({
+      scrollToTop: resetScroll,
+      reload: repeater.reload,
+      componentId: componentId
+    }, componentId);
   }
-
-
 
 
   function resetScroll() {
@@ -123,6 +140,10 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     return displayHeight;
   }
 
+  function getScrollDirection() {
+    return scrollDirection;
+  }
+
   function setContainerHeight(height) {
     totalHeight = height;
     $element[0].style.height = height + 'px';
@@ -140,6 +161,13 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     }
   }
 
+  // this is used for pagination loader
+  function calculateScrollMovement() {
+    var currentScrollTop = getScrollParentScrollTop();
+    scrollDirection = currentScrollTop > previousScrollTop ? 'down' : 'up';
+    previousScrollTop = currentScrollTop;
+  }
+
   function handleScroll() {
     var transform;
     var update = false;
@@ -151,6 +179,8 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
     var overflowOffset = (Math.max(0, (floaterTop / itemSize)) % 1) * itemSize; // an offset from 0 - itemSize to offset the positions
     var topOffset = virtualPeteUtil.getOffsetTopDifference($element[0], overflowParent); // the y diff between the virtual-pete-container and what it is scrolling in
     scrollOffset = Math.max(0, getScrollParentScrollTop() - topOffset); // the scroll amount after the virtual-pete-container hits the top of the overflowParent
+
+    calculateScrollMovement();
 
     if (displayHeight !== height) {
       displayHeight = height;
