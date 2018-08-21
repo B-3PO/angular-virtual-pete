@@ -297,10 +297,9 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       function updatePagination() {
         var pageEndIndex = newEndIndex - NUM_EXTRA;
         currentPage = Math.ceil(pageEndIndex / pageCount);
+        if (currentPage < 1) currentPage = 1;
         var nextPage = containerCtrl.getScrollDirection() === 'down' ? currentPage + 1 : currentPage - 1;
         if (nextPage < 1) nextPage = 1;
-        // var pageEnd = currentPage * pageCount;
-        // var atPagesEnd = newEndIndex >= pageEnd;
 
         if (!paginationLoading && hasPagination && nextPage && nextPage !== lastPageLoaded) {
           if (paginationData[nextPage] && !paginationData[nextPage].length) return;
