@@ -245,7 +245,9 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   var lastOverflowOffset;
   var scrollOffset = 0;
   var previousScrollTop = 0;
-  var scrollDirection;
+  var scrollDirection = 'down';
+  var frameOneDirection;
+  var frameTwoDirection;
 
   var rAFHandleScroll = $$rAF.throttle(handleScroll);
   var offsetSize = parseInt($attrs.offsetSize) || 0;
@@ -358,10 +360,24 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   }
 
   // this is used for pagination loader
+  // use a single frame delay to negate any flutter in direction
   function calculateScrollMovement() {
     var currentScrollTop = getScrollParentScrollTop();
-    if (currentScrollTop !== previousScrollTop) scrollDirection = currentScrollTop > previousScrollTop ? 'down' : 'up';
+    if (!scrollDirection) scrollDirection = getImmediateDirection(currentScrollTop);
+    if (frameOneDirection === undefined) {
+      frameOneDirection = getImmediateDirection(currentScrollTop);
+      frameTwoDirection = undefined;
+    } else if (frameTwoDirection === undefined) {
+      frameTwoDirection = getImmediateDirection(currentScrollTop);
+      if (frameOneDirection === frameTwoDirection) scrollDirection = frameOneDirection;
+      frameOneDirection = undefined;
+    }
     previousScrollTop = currentScrollTop;
+  }
+
+  function getImmediateDirection(currentScrollTop) {
+    if (previousScrollTop === currentScrollTop) return scrollDirection;
+    return previousScrollTop > currentScrollTop ? 'up' : 'down';
   }
 
   function handleScroll() {
