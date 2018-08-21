@@ -164,7 +164,7 @@ function VirtualRepeatContainerController($scope, $element, $attrs, $parse, $$rA
   // this is used for pagination loader
   function calculateScrollMovement() {
     var currentScrollTop = getScrollParentScrollTop();
-    scrollDirection = currentScrollTop > previousScrollTop ? 'down' : 'up';
+    if (currentScrollTop !== previousScrollTop) scrollDirection = currentScrollTop > previousScrollTop ? 'down' : 'up';
     previousScrollTop = currentScrollTop;
   }
 
