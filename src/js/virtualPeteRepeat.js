@@ -99,7 +99,12 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
       });
 
       if (hasLoader) {
-        listSetter = $parse(match[2].split(' | ')[0]).assign;
+        // parse the variable to be set. allow for it to be wrapped in a function
+        // item in list | filter:term
+        // item in thefunc(list) | filter:term
+        // this will pull list out
+        const splitList = match[2].split(' | ')[0].split(/[(),]/g);
+        listSetter = $parse(splitList.length > 1 ? splitList[1] : splitList[0]).assign;
         setTimeout(function () {
           load(1);
         }, 0);

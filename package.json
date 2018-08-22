@@ -1,6 +1,6 @@
 {
   "name": "angular-virtual-pete",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": "Ben Rubin",
   "description": "Angular component for virtual repeat",
   "keywords": "angular, component, virtual, repeat, infinite, virtual-repeat, virtual-pete, angular-virtual-pete",
