@@ -118,9 +118,10 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
         var searchDebounce = containerCtrl.debounce(function (value) {
           if (!value || value.length < 2) return;
           $q.resolve(searchLoaderParser(scope, { '$term': value })).then(function (results) {
-            var ids = addedItems.map(function (i) { return i.id; });
+            results = (results || []);
             // filter out dups
-            addedItems = (results || []).filter(function (i) { return ids.indexOf(i.id) === -1; }).concat(addedItems);
+            var ids = results.map(function (i) { return i.id; });
+            addedItems = addedItems.filter(function (i) { return ids.indexOf(i.id) === -1; }).concat(results);
             buildLoadedData();
           });
         }, 200, scope);
@@ -139,7 +140,17 @@ function virtualPeteRepeatDirective($parse, $rootScope, $document, $q, $mdUtil) 
           return items.length;
         },
         reload: function () {
+          if (searchTermParser) {
+            var searchTerm = searchTermParser(scope);
+            if (searchTerm && searchTerm.length > 1) return searchDebounce(searchTerm);
+          }
+
+          // TODO change this to current visable pages. This will work for now
           load(currentPage);
+          var previousPage = currentPage - 1;
+          if (previousPage < 1) currentPage = 1;
+          if (previousPage !== currentPage) load(previousPage);
+          load(currentPage + 1);
         },
         getMdComponentId: function () {
           if (tAttrs.mdComponentId === undefined) tAttrs.$set('mdComponentId', '_expansion_panel_id_' + $mdUtil.nextUid());
